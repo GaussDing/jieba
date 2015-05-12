@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 # Last modified: linpeng.ding(DDYDLP@gmail.com)
 
+import os
 import re
 import jieba
 import jieba.posseg as posse
@@ -17,7 +18,7 @@ re_skip_cut_all = re.compile("[^a-zA-Z0-9+#\n]", re.U)
 
 
 def segment_words(texts):
-    word_info = jieba.cut_for_search(texts)
+    word_info = jieba.cut(texts, cut_all=True)
     for item in word_info:
         print item
 
@@ -45,6 +46,8 @@ def segment_text_desc(word):
     """
     key_words = sorted(jieba.cut_for_search(word), key=lambda x: len(x), reverse=True)[:5]
 
+    for item in key_words:
+        print item
     return list(key_words)
 
 
@@ -71,7 +74,8 @@ def segment_cut_all_word(word):
     :return:
     """
     seg_words = jieba.cut(word, cut_all=True)
-
+    for item in seg_words:
+        print item
     return list(seg_words)
 
 
@@ -92,6 +96,9 @@ if __name__ == "__main__":
     关键字提取：清华大学美术学院/阿狸/虚构/狐狸/一名/创造/学生/来自/出来
               根据tf/idf方法，进行词排序
     """
-    words = u"爸爸去哪儿"
-
-    segment_word(words)
+    words = u"贪心算法遍历每一个字，每个字刻画组成词的子节点结构"
+    segment_words(words)
+    # segment_word(words)
+    # segment_cut_all_word(words)
+    # segment_text_desc(words)
+    # segment_user_input(words)

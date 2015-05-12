@@ -25,8 +25,7 @@ initialized = False
 pool = None
 tmp_dir = None
 
-_curpath = os.path.normpath(
-    os.path.join(os.getcwd(), os.path.dirname(__file__)))
+_curpath = os.path.normpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
 log_console = logging.StreamHandler(sys.stderr)
 logger = logging.getLogger(__name__)
@@ -39,26 +38,31 @@ def setLogLevel(log_level):
     logger.setLevel(log_level)
 
 
-def gen_pfdict(f_name):
-    lfreq = {}
-    ltotal = 0
-    with open(f_name, 'rb') as f:
-        lineno = 0
-        for line in f.read().rstrip().decode('utf-8').splitlines():
-            lineno += 1
+def gen_dict_data(file_path):
+    """
+    this import dict must include the word and freq: innovation 20 [n, v ...]
+    :param file_path: file abs path
+    :return:
+    """
+    dict_word_freq = {}
+    word_freq_total = 0
+
+    with open(file_path, 'rb') as f:
+        for line, content in enumerate(f.read().rstrip().decode('utf-8').splitlines()):
             try:
-                word, freq = line.split(' ')[:2]
+                word, freq = content.split(' ')[:2]
                 freq = int(freq)
-                lfreq[word] = freq
-                ltotal += freq
+                dict_word_freq[word] = freq
+                word_freq_total += freq
                 for ch in xrange(len(word)):
-                    wfrag = word[:ch + 1]
-                    if wfrag not in lfreq:
-                        lfreq[wfrag] = 0
+                    word_cut = word[:ch + 1]
+                    if word_cut not in dict_word_freq:
+                        dict_word_freq[word_cut] = 0
             except ValueError as e:
-                logger.debug('%s at line %s %s' % (f_name, lineno, line))
+                logger.debug('%s at line %s %s' % (f.name, line, content))
                 raise e
-    return lfreq, ltotal
+
+    return dict_word_freq, word_freq_total
 
 
 def initialize(dictionary=None):
@@ -68,29 +72,30 @@ def initialize(dictionary=None):
     with DICT_LOCK:
         if initialized:
             return
+        dict_abs_path = os.path.join(_curpath, dictionary)
+        logger.debug("Building prefix dict from %s ..." % dict_abs_path)
+        start = time.time()
 
-        abs_path = os.path.join(_curpath, dictionary)
-        logger.debug("Building prefix dict from %s ..." % abs_path)
-        t1 = time.time()
-        # default dictionary
-        if abs_path == os.path.join(_curpath, "dict.txt"):
-            cache_file = os.path.join(tmp_dir if tmp_dir else tempfile.gettempdir(),"jieba.cache")
-        else:  # custom dictionary
-            cache_file = os.path.join(tmp_dir if tmp_dir else tempfile.gettempdir(),"jieba.u%s.cache" % md5(
-                abs_path.encode('utf-8', 'replace')).hexdigest())
+        # default dictionary, else is custom dictionary
+        if dict_abs_path == os.path.join(_curpath, "dict.txt"):
+            cache_file = os.path.join(tmp_dir if tmp_dir else tempfile.gettempdir(), "jieba.cache")
+        else:
+            cache_file = os.path.join(
+                tmp_dir if tmp_dir else tempfile.gettempdir(),
+                "jieba.u%s.cache" % md5(dict_abs_path.encode('utf-8', 'replace')).hexdigest())
 
         load_from_cache_fail = True
-        if os.path.isfile(cache_file) and os.path.getmtime(cache_file) > os.path.getmtime(abs_path):
+        if os.path.isfile(cache_file) and os.path.getmtime(cache_file) > os.path.getmtime(dict_abs_path):
             logger.debug("Loading model from cache %s" % cache_file)
             try:
                 with open(cache_file, 'rb') as cf:
                     FREQ, total = marshal.load(cf)
                 load_from_cache_fail = False
-            except Exception:
-                load_from_cache_fail = True
+            except (ValueError, TypeError, EOFError):
+                logger.debug("open cache file is failure.")
 
         if load_from_cache_fail:
-            FREQ, total = gen_pfdict(abs_path)
+            FREQ, total = gen_dict_data(dict_abs_path)
             logger.debug("Dumping model to file cache %s" % cache_file)
             try:
                 fd, fpath = tempfile.mkstemp()
@@ -101,17 +106,15 @@ def initialize(dictionary=None):
                 else:
                     replace_file = os.rename
                 replace_file(fpath, cache_file)
-            except Exception:
-                logger.exception("Dump cache file failed.")
-
+            except Exception as e:
+                logger.exception("Dump cache file failed: {}".format(e))
         initialized = True
 
-        logger.debug("Loading model cost %s seconds." % (time.time() - t1))
-        logger.debug("Prefix dict has been built succesfully.")
+        logger.debug("Loading model cost %s seconds." % (time.time() - start))
+        logger.debug("Prefix dict has been built successfully.")
 
 
 def require_initialized(fn):
-
     @wraps(fn)
     def wrapped(*args, **kwargs):
         global initialized
@@ -120,22 +123,49 @@ def require_initialized(fn):
         else:
             initialize(DICTIONARY)
             return fn(*args, **kwargs)
-
     return wrapped
 
 
+@require_initialized
+def get_sentence_dag(sentence):
+    global FREQ
+    sentence_dag = {}
+
+    length = len(sentence)
+    for k in xrange(length):
+        tmp_list = []
+        i = k
+        frag = sentence[k]
+        while i < length and frag in FREQ:
+            if FREQ[frag]:
+                tmp_list.append(i)
+            i += 1
+            frag = sentence[k:i + 1]
+        if not tmp_list:
+            tmp_list.append(k)
+        sentence_dag[k] = tmp_list
+
+    return sentence_dag
+
+
 def __cut_all(sentence):
-    dag = get_DAG(sentence)
-    old_j = -1
-    for k, L in iteritems(dag):
-        if len(L) == 1 and k > old_j:
-            yield sentence[k:L[0] + 1]
-            old_j = L[0]
+    """
+    traversal the sentence_dag input the every pos can combine word
+    :param sentence:
+    :return:
+    """
+    word_dag = get_sentence_dag(sentence)
+    init_pos = -1
+    for pos, node in iteritems(word_dag):
+        if len(node) == 1 and pos > init_pos:
+            yield sentence[pos]
+            init_pos = pos
         else:
-            for j in L:
-                if j > k:
-                    yield sentence[k:j + 1]
-                    old_j = j
+            for j in node:
+                if j > pos:
+                    yield sentence[pos: j + 1]
+            if node[-1] > init_pos:
+                init_pos = node[-1]
 
 
 def calc(sentence, DAG, route):
@@ -146,31 +176,11 @@ def calc(sentence, DAG, route):
         route[idx] = max((log(FREQ.get(sentence[idx:x + 1]) or 1) -
                           logtotal + route[x + 1][0], x) for x in DAG[idx])
 
-
-@require_initialized
-def get_DAG(sentence):
-    global FREQ
-    DAG = {}
-    N = len(sentence)
-    for k in xrange(N):
-        tmplist = []
-        i = k
-        frag = sentence[k]
-        while i < N and frag in FREQ:
-            if FREQ[frag]:
-                tmplist.append(i)
-            i += 1
-            frag = sentence[k:i + 1]
-        if not tmplist:
-            tmplist.append(k)
-        DAG[k] = tmplist
-    return DAG
-
 re_eng = re.compile('[a-zA-Z0-9]', re.U)
 
 
 def __cut_DAG_NO_HMM(sentence):
-    DAG = get_DAG(sentence)
+    DAG = get_sentence_dag(sentence)
     route = {}
     calc(sentence, DAG, route)
     x = 0
@@ -194,7 +204,7 @@ def __cut_DAG_NO_HMM(sentence):
 
 
 def __cut_DAG(sentence):
-    DAG = get_DAG(sentence)
+    DAG = get_sentence_dag(sentence)
     route = {}
     calc(sentence, DAG, route=route)
     x = 0
@@ -233,40 +243,33 @@ def __cut_DAG(sentence):
             for elem in buf:
                 yield elem
 
-re_han_default = re.compile("([\u4E00-\u9FA5a-zA-Z0-9+#&\._]+)", re.U)
-re_skip_default = re.compile("(\r\n|\s)", re.U)
+# re_han_default = re.compile("([\u4E00-\u9FA5a-zA-Z0-9+#&\._]+)", re.U)
+# re_skip_default = re.compile("(\r\n|\s)", re.U)
 re_han_cut_all = re.compile("([\u4E00-\u9FA5]+)", re.U)
 re_skip_cut_all = re.compile("[^a-zA-Z0-9+#\n]", re.U)
 
 
-def cut(sentence, cut_all=False, HMM=True):
-    '''
+def cut(sentence, cut_all=False, hmm=True):
+    """
     The main function that segments an entire sentence that contains
-    Chinese characters into seperated words.
+    Chinese characters into separated words.
+    :param sentence: The str(unicode) to be segmented.
+    :param cut_all: Model type. True for full pattern, False for accurate pattern.
+    :param hmm: Whether to use the Hidden Markov Model.
+    :return:
+    """
+    re_han = re_han_cut_all
+    re_skip = re_skip_cut_all
 
-    Parameter:
-        - sentence: The str(unicode) to be segmented.
-        - cut_all: Model type. True for full pattern, False for accurate pattern.
-        - HMM: Whether to use the Hidden Markov Model.
-    '''
     sentence = strdecode(sentence)
-
-    # \u4E00-\u9FA5a-zA-Z0-9+#&\._ : All non-space characters. Will be handled with re_han
-    # \r\n|\s : whitespace characters. Will not be handled.
-
-    if cut_all:
-        re_han = re_han_cut_all
-        re_skip = re_skip_cut_all
-    else:
-        re_han = re_han_default
-        re_skip = re_skip_default
     blocks = re_han.split(sentence)
     if cut_all:
         cut_block = __cut_all
-    elif HMM:
+    elif hmm:
         cut_block = __cut_DAG
     else:
         cut_block = __cut_DAG_NO_HMM
+
     for blk in blocks:
         if not blk:
             continue
@@ -289,7 +292,7 @@ def cut_for_search(sentence, HMM=True):
     """
     Finer segmentation for search engines.
     """
-    words = cut(sentence, HMM=HMM)
+    words = cut(sentence, hmm=HMM)
     for w in words:
         if len(w) > 2:
             for i in xrange(len(w) - 1):
@@ -384,7 +387,7 @@ def suggest_freq(segment, tune=False):
     freq = 1
     if isinstance(segment, string_types):
         word = segment
-        for seg in cut(word, HMM=False):
+        for seg in cut(word, hmm=False):
             freq *= FREQ.get(seg, 1) / ftotal
         freq = max(int(freq*total) + 1, FREQ.get(word, 1))
     else:
@@ -487,12 +490,12 @@ def tokenize(unicode_sentence, mode="default", HMM=True):
         raise Exception("jieba: the input parameter should be unicode.")
     start = 0
     if mode == 'default':
-        for w in cut(unicode_sentence, HMM=HMM):
+        for w in cut(unicode_sentence, hmm=HMM):
             width = len(w)
             yield (w, start, start + width)
             start += width
     else:
-        for w in cut(unicode_sentence, HMM=HMM):
+        for w in cut(unicode_sentence, hmm=HMM):
             width = len(w)
             if len(w) > 2:
                 for i in xrange(len(w) - 1):
