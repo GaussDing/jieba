@@ -9,7 +9,7 @@ import jieba.posseg as posse
 import jieba.analyse as analyse
 
 
-jieba.load_userdict('userdict.txt')
+# jieba.load_userdict('userdict.txt')
 
 re_han_default = re.compile("([\u4E00-\u9FA5a-zA-Z0-9+#&\._]+)", re.U)
 re_skip_default = re.compile("(\r\n|\s)", re.U)
@@ -17,8 +17,14 @@ re_han_cut_all = re.compile("([\u4E00-\u9FA5]+)", re.U)
 re_skip_cut_all = re.compile("[^a-zA-Z0-9+#\n]", re.U)
 
 
-def segment_words(texts):
+def segment_all_words(texts):
     word_info = jieba.cut(texts, cut_all=True)
+    for item in word_info:
+        print item
+
+
+def segment_hmm_words(texts):
+    word_info = jieba.cut(texts, hmm=True)
     for item in word_info:
         print item
 
@@ -96,8 +102,10 @@ if __name__ == "__main__":
     关键字提取：清华大学美术学院/阿狸/虚构/狐狸/一名/创造/学生/来自/出来
               根据tf/idf方法，进行词排序
     """
-    words = u"贪心算法遍历每一个字，每个字刻画组成词的子节点结构"
-    segment_words(words)
+    words = u"工信处女干事每月经过下属科室都要亲口交代交换机等技术性器件的安装工作, 科学术"
+    # segment_all_words(words)
+    segment_hmm_words(words)
+    # print jieba.FREQ[u"干事"]
     # segment_word(words)
     # segment_cut_all_word(words)
     # segment_text_desc(words)

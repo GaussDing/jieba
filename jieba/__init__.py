@@ -148,6 +148,40 @@ def get_sentence_dag(sentence):
     return sentence_dag
 
 
+def calc_path_backward(sentence, word_dag, route):
+    length = len(sentence)
+    route[length] = (0, 0)
+    logtotal = int(log(total))
+    for idx in xrange(length - 1, -1, -1):
+        route[idx] = max((int(log(FREQ.get(sentence[idx:x + 1]) or 1)) -
+                          logtotal + route[x + 1][0], x) for x in word_dag[idx])
+
+
+def calc_path_ford(sentence, word_dag, route):
+    length = len(sentence)
+    path = {}
+    route[0] = [0, None]
+    for item in xrange(1, length):
+        route[item] = [100000, None]
+    logtotal = int(log(total))
+    stack = [word_dag[0][0]]
+    while route[length-1][0] == 100000:
+        node = stack.pop()
+        for item in word_dag[node]:
+            if item != node:
+                path_val = -(int(log(FREQ.get(sentence[node:item + 1]) or 1)) - logtotal) + route[node][0]
+                if path_val < route[item][0]:
+                    route[item] = [path_val, node]
+                    path[path_val] = item
+        if path:
+            min_node = path[min(path.keys())]
+            stack.append(min_node)
+            del path[route[min_node][0]]
+        else:
+            stack.append(node + 1)
+            route[node + 1] = [route[node][0], None]
+
+
 def __cut_all(sentence):
     """
     traversal the sentence_dag input the every pos can combine word
@@ -168,21 +202,100 @@ def __cut_all(sentence):
                 init_pos = node[-1]
 
 
-def calc(sentence, DAG, route):
-    N = len(sentence)
-    route[N] = (0, 0)
-    logtotal = log(total)
-    for idx in xrange(N - 1, -1, -1):
-        route[idx] = max((log(FREQ.get(sentence[idx:x + 1]) or 1) -
-                          logtotal + route[x + 1][0], x) for x in DAG[idx])
-
 re_eng = re.compile('[a-zA-Z0-9]', re.U)
 
 
-def __cut_DAG_NO_HMM(sentence):
-    DAG = get_sentence_dag(sentence)
+# def __cut_with_hmm(sentence):
+#     word_dag = get_sentence_dag(sentence)
+#     route = {}
+#     start = time.time()
+#     calc_path_backward(sentence, word_dag, route=route)
+#     logger.debug(time.time() - start)
+#     x = 0
+#     buf = ''
+#     N = len(sentence)
+#     while x < N:
+#         y = route[x][1] + 1
+#         l_word = sentence[x:y]
+#         if y - x == 1:
+#             buf += l_word
+#         else:
+#             if buf:
+#                 if len(buf) == 1:
+#                     yield buf
+#                     buf = ''
+#                 else:
+#                     if not FREQ.get(buf):
+#                         recognized = finalseg.cut(buf)
+#                         for t in recognized:
+#                             yield t
+#                     else:
+#                         for elem in buf:
+#                             yield elem
+#                     buf = ''
+#             yield l_word
+#         x = y
+#
+#     if buf:
+#         if len(buf) == 1:
+#             yield buf
+#         elif not FREQ.get(buf):
+#             recognized = finalseg.cut(buf)
+#             for t in recognized:
+#                 yield t
+#         else:
+#             for elem in buf:
+#                 yield elem
+
+
+def __cut_with_hmm(sentence):
+    word_dag = get_sentence_dag(sentence)
     route = {}
-    calc(sentence, DAG, route)
+    start = time.time()
+    calc_path_ford(sentence, word_dag, route=route)
+    logger.debug(time.time() - start)
+    buf = ''
+    x = len(sentence) - 1
+    while x >= 0:
+        y = route[x][1]
+        if y is None:
+            y = x
+        l_word = sentence[y: x + 1]
+        if not(x - y):
+            buf += l_word
+        else:
+            if buf:
+                if len(buf) == 1:
+                    yield buf
+                    buf = ''
+                else:
+                    if not FREQ.get(buf):
+                        recognized = finalseg.cut(buf)
+                        for t in recognized:
+                            yield t
+                    else:
+                        for elem in buf:
+                            yield elem
+                    buf = ''
+            yield l_word
+        x = y - 1
+
+    if buf:
+        if len(buf) == 1:
+            yield buf
+        elif not FREQ.get(buf):
+            recognized = finalseg.cut(buf)
+            for t in recognized:
+                yield t
+        else:
+            for elem in buf:
+                yield elem
+
+
+def __cut_no_hmm(sentence):
+    word_dag = get_sentence_dag(sentence)
+    route = {}
+    calc_path_backward(sentence, word_dag, route=route)
     x = 0
     N = len(sentence)
     buf = ''
@@ -202,46 +315,6 @@ def __cut_DAG_NO_HMM(sentence):
         yield buf
         buf = ''
 
-
-def __cut_DAG(sentence):
-    DAG = get_sentence_dag(sentence)
-    route = {}
-    calc(sentence, DAG, route=route)
-    x = 0
-    buf = ''
-    N = len(sentence)
-    while x < N:
-        y = route[x][1] + 1
-        l_word = sentence[x:y]
-        if y - x == 1:
-            buf += l_word
-        else:
-            if buf:
-                if len(buf) == 1:
-                    yield buf
-                    buf = ''
-                else:
-                    if not FREQ.get(buf):
-                        recognized = finalseg.cut(buf)
-                        for t in recognized:
-                            yield t
-                    else:
-                        for elem in buf:
-                            yield elem
-                    buf = ''
-            yield l_word
-        x = y
-
-    if buf:
-        if len(buf) == 1:
-            yield buf
-        elif not FREQ.get(buf):
-            recognized = finalseg.cut(buf)
-            for t in recognized:
-                yield t
-        else:
-            for elem in buf:
-                yield elem
 
 # re_han_default = re.compile("([\u4E00-\u9FA5a-zA-Z0-9+#&\._]+)", re.U)
 # re_skip_default = re.compile("(\r\n|\s)", re.U)
@@ -266,9 +339,9 @@ def cut(sentence, cut_all=False, hmm=True):
     if cut_all:
         cut_block = __cut_all
     elif hmm:
-        cut_block = __cut_DAG
+        cut_block = __cut_with_hmm
     else:
-        cut_block = __cut_DAG_NO_HMM
+        cut_block = __cut_no_hmm
 
     for blk in blocks:
         if not blk:
