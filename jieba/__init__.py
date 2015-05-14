@@ -202,22 +202,55 @@ def __cut_all(sentence):
                 init_pos = node[-1]
 
 
-re_eng = re.compile('[a-zA-Z0-9]', re.U)
+def __cut_with_hmm(sentence):
+    word_dag = get_sentence_dag(sentence)
+    route = {}
+    calc_path_backward(sentence, word_dag, route=route)
+    x = 0
+    buf = ''
+    length = len(sentence)
+    while x < length:
+        y = route[x][1] + 1
+        l_word = sentence[x:y]
+        if y - x == 1:
+            buf += l_word
+        else:
+            if buf:
+                if not FREQ.get(buf):
+                    recognized = finalseg.cut(buf)
+                    for t in recognized:
+                        yield t
+                else:
+                    for elem in buf:
+                        yield elem
+                buf = ''
+            yield l_word
+        x = y
+
+    if buf:
+        if not FREQ.get(buf):
+            recognized = finalseg.cut(buf)
+            for t in recognized:
+                yield t
+        else:
+            for elem in buf:
+                yield elem
 
 
 # def __cut_with_hmm(sentence):
 #     word_dag = get_sentence_dag(sentence)
 #     route = {}
 #     start = time.time()
-#     calc_path_backward(sentence, word_dag, route=route)
+#     calc_path_ford(sentence, word_dag, route=route)
 #     logger.debug(time.time() - start)
-#     x = 0
 #     buf = ''
-#     N = len(sentence)
-#     while x < N:
-#         y = route[x][1] + 1
-#         l_word = sentence[x:y]
-#         if y - x == 1:
+#     x = len(sentence) - 1
+#     while x >= 0:
+#         y = route[x][1]
+#         if y is None:
+#             y = x
+#         l_word = sentence[y: x + 1]
+#         if not(x - y):
 #             buf += l_word
 #         else:
 #             if buf:
@@ -234,7 +267,7 @@ re_eng = re.compile('[a-zA-Z0-9]', re.U)
 #                             yield elem
 #                     buf = ''
 #             yield l_word
-#         x = y
+#         x = y - 1
 #
 #     if buf:
 #         if len(buf) == 1:
@@ -248,48 +281,7 @@ re_eng = re.compile('[a-zA-Z0-9]', re.U)
 #                 yield elem
 
 
-def __cut_with_hmm(sentence):
-    word_dag = get_sentence_dag(sentence)
-    route = {}
-    start = time.time()
-    calc_path_ford(sentence, word_dag, route=route)
-    logger.debug(time.time() - start)
-    buf = ''
-    x = len(sentence) - 1
-    while x >= 0:
-        y = route[x][1]
-        if y is None:
-            y = x
-        l_word = sentence[y: x + 1]
-        if not(x - y):
-            buf += l_word
-        else:
-            if buf:
-                if len(buf) == 1:
-                    yield buf
-                    buf = ''
-                else:
-                    if not FREQ.get(buf):
-                        recognized = finalseg.cut(buf)
-                        for t in recognized:
-                            yield t
-                    else:
-                        for elem in buf:
-                            yield elem
-                    buf = ''
-            yield l_word
-        x = y - 1
-
-    if buf:
-        if len(buf) == 1:
-            yield buf
-        elif not FREQ.get(buf):
-            recognized = finalseg.cut(buf)
-            for t in recognized:
-                yield t
-        else:
-            for elem in buf:
-                yield elem
+re_eng = re.compile('[a-zA-Z0-9]', re.U)
 
 
 def __cut_no_hmm(sentence):
@@ -297,9 +289,9 @@ def __cut_no_hmm(sentence):
     route = {}
     calc_path_backward(sentence, word_dag, route=route)
     x = 0
-    N = len(sentence)
+    length = len(sentence)
     buf = ''
-    while x < N:
+    while x < length:
         y = route[x][1] + 1
         l_word = sentence[x:y]
         if re_eng.match(l_word) and len(l_word) == 1:
@@ -313,7 +305,6 @@ def __cut_no_hmm(sentence):
             x = y
     if buf:
         yield buf
-        buf = ''
 
 
 # re_han_default = re.compile("([\u4E00-\u9FA5a-zA-Z0-9+#&\._]+)", re.U)
