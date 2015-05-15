@@ -2,14 +2,13 @@
 # -*- coding: utf-8 -*-
 # Last modified: linpeng.ding(DDYDLP@gmail.com)
 
-import os
 import re
 import jieba
 import jieba.posseg as posse
 import jieba.analyse as analyse
 
 
-# jieba.load_userdict('userdict.txt')
+jieba.load_userdict('userdict.txt')
 
 re_han_default = re.compile("([\u4E00-\u9FA5a-zA-Z0-9+#&\._]+)", re.U)
 re_skip_default = re.compile("(\r\n|\s)", re.U)
@@ -50,7 +49,7 @@ def segment_text_desc(word):
     :param word:
     :return:
     """
-    key_words = sorted(jieba.cut_for_search(word), key=lambda x: len(x), reverse=True)[:5]
+    key_words = jieba.tokenize(word)
 
     for item in key_words:
         print item
@@ -104,8 +103,7 @@ if __name__ == "__main__":
     """
     words = u"工信处女干事每月经过下属科室都要亲口交代交换机等技术性器件的安装工作, 科学术"
     # segment_all_words(words)
-    segment_hmm_words(words)
-    # print jieba.FREQ[u"干事"]
+    segment_text_desc(words)
     # segment_word(words)
     # segment_cut_all_word(words)
     # segment_text_desc(words)

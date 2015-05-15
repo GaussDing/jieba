@@ -4,7 +4,6 @@ __license__ = 'MIT'
 
 import re
 import os
-import sys
 import time
 import tempfile
 import marshal
@@ -33,7 +32,7 @@ logger.setLevel(logging.DEBUG)
 logger.addHandler(log_console)
 
 
-def setLogLevel(log_level):
+def set_log_level(log_level):
     global logger
     logger.setLevel(log_level)
 
@@ -54,7 +53,7 @@ def gen_dict_data(file_path):
                 freq = int(freq)
                 dict_word_freq[word] = freq
                 word_freq_total += freq
-                for ch in xrange(len(word)):
+                for ch in xrange(len(word) - 1):
                     word_cut = word[:ch + 1]
                     if word_cut not in dict_word_freq:
                         dict_word_freq[word_cut] = 0
@@ -117,7 +116,6 @@ def initialize(dictionary=None):
 def require_initialized(fn):
     @wraps(fn)
     def wrapped(*args, **kwargs):
-        global initialized
         if initialized:
             return fn(*args, **kwargs)
         else:
@@ -151,7 +149,7 @@ def get_sentence_dag(sentence):
 def calc_path_backward(sentence, word_dag, route):
     length = len(sentence)
     route[length] = (0, 0)
-    logtotal = int(log(total))
+    logtotal = int(log(total + 1))
     for idx in xrange(length - 1, -1, -1):
         route[idx] = max((int(log(FREQ.get(sentence[idx:x + 1]) or 1)) -
                           logtotal + route[x + 1][0], x) for x in word_dag[idx])
@@ -352,54 +350,50 @@ def cut(sentence, cut_all=False, hmm=True):
                     yield x
 
 
-def cut_for_search(sentence, HMM=True):
+def cut_for_search(sentence, hmm=True):
     """
     Finer segmentation for search engines.
+    # TODO maybe need new complement
     """
-    words = cut(sentence, hmm=HMM)
-    for w in words:
-        if len(w) > 2:
-            for i in xrange(len(w) - 1):
-                gram2 = w[i:i + 2]
+    words = cut(sentence, hmm=hmm)
+    for word in words:
+        length = len(word)
+        if length > 2:
+            for i in xrange(length - 1):
+                gram2 = word[i:i + 2]
                 if FREQ.get(gram2):
                     yield gram2
-        if len(w) > 3:
-            for i in xrange(len(w) - 2):
-                gram3 = w[i:i + 3]
+        if length > 3:
+            for i in xrange(length - 2):
+                gram3 = word[i:i + 3]
                 if FREQ.get(gram3):
                     yield gram3
-        yield w
+        yield word
 
 
 @require_initialized
-def load_userdict(f):
-    '''
+def load_userdict(file_path):
+    """
     Load personalized dict to improve detect rate.
-
-    Parameter:
-        - f : A plain text file contains words and their ocurrences.
-
     Structure of dict file:
     word1 freq1 word_type1
     word2 freq2 word_type2
     ...
     Word type may be ignored
-    '''
-    if isinstance(f, string_types):
-        f = open(f, 'rb')
-    content = f.read().decode('utf-8').lstrip('\ufeff')
-    line_no = 0
-    for line in content.splitlines():
-        try:
-            line_no += 1
-            line = line.strip()
-            if not line:
-                continue
-            tup = line.split(" ")
-            add_word(*tup)
-        except Exception as e:
-            logger.debug('%s at line %s %s' % (f, line_no, line))
-            raise e
+    :param file_path: A plain text file contains words and their occurrences.
+    :return:
+    """
+    with open(file_path, 'rb') as fp:
+        content = fp.read().decode('utf-8').lstrip('\ufeff')
+        for line, item in enumerate(content.splitlines()):
+            try:
+                tup = item.strip().split(" ")
+                if not item:
+                    continue
+                add_word(*tup)
+            except Exception as e:
+                logger.debug('%s at line %s %s' % (fp.name, line, item))
+                raise e
 
 
 @require_initialized
@@ -410,58 +404,54 @@ def add_word(word, freq=None, tag=None):
     freq and tag can be omitted, freq defaults to be a calculated value
     that ensures the word can be cut out.
     """
-    global FREQ, total, user_word_tag_tab
+    global total
     word = strdecode(word)
     if freq is None:
-        freq = suggest_freq(word, False)
+        freq = suggest_freq(word)
     else:
         freq = int(freq)
     FREQ[word] = freq
     total += freq
-    if tag is not None:
+    if tag:
         user_word_tag_tab[word] = tag
-    for ch in xrange(len(word)):
-        wfrag = word[:ch + 1]
-        if wfrag not in FREQ:
-            FREQ[wfrag] = 0
+    for ch in xrange(len(word) - 1):
+        word_cut = word[:ch + 1]
+        if word_cut not in FREQ:
+            FREQ[word_cut] = 0
 
 
 def del_word(word):
     """
     Convenient function for deleting a word.
     """
-    add_word(word, 0)
+    FREQ[word] = 0
 
 
 @require_initialized
-def suggest_freq(segment, tune=False):
+def suggest_freq(segment):
     """
     Suggest word frequency to force the characters in a word to be
-    joined or splitted.
-
-    Parameter:
-        - segment : The segments that the word is expected to be cut into,
-                    If the word should be treated as a whole, use a str.
-        - tune : If True, tune the word frequency.
-
+    joined or split.
     Note that HMM may affect the final result. If the result doesn't change,
     set HMM=False.
+    :param segment: The segments that the word is expected to be cut into,
+                    If the word should be treated as a whole, use a str.
+    :return:
+    # TODO about the join word weight set
     """
-    ftotal = float(total)
-    freq = 1
+    f_total = float(total)
+    freq = total
     if isinstance(segment, string_types):
-        word = segment
-        for seg in cut(word, hmm=False):
-            freq *= FREQ.get(seg, 1) / ftotal
-        freq = max(int(freq*total) + 1, FREQ.get(word, 1))
+        for seg in cut(segment, hmm=False):
+            freq *= FREQ.get(seg, 1) / f_total
+        freq = max(int(freq) + 1, FREQ.get(segment, 1))
     else:
         segment = tuple(map(strdecode, segment))
         word = ''.join(segment)
         for seg in segment:
-            freq *= FREQ.get(seg, 1) / ftotal
-        freq = min(int(freq*total), FREQ.get(word, 0))
-    if tune:
-        add_word(word, freq)
+            freq *= FREQ.get(seg, 1) / f_total
+        freq = min(int(freq), FREQ.get(word, 0))
+
     return freq
 
 
@@ -541,35 +531,34 @@ def get_abs_path_dict():
     return os.path.join(_curpath, DICTIONARY)
 
 
-def tokenize(unicode_sentence, mode="default", HMM=True):
+def tokenize(unicode_sentence, mode="default", hmm=True):
     """
     Tokenize a sentence and yields tuples of (word, start, end)
-
-    Parameter:
-        - sentence: the str(unicode) to be segmented.
-        - mode: "default" or "search", "search" is for finer segmentation.
-        - HMM: whether to use the Hidden Markov Model.
+    :param unicode_sentence: the str(unicode) to be segmented.
+    :param mode: "default" or "search", "search" is for finer segmentation.
+    :param hmm: whether to use the Hidden Markov Model.
+    :return:
     """
     if not isinstance(unicode_sentence, text_type):
         raise Exception("jieba: the input parameter should be unicode.")
     start = 0
     if mode == 'default':
-        for w in cut(unicode_sentence, hmm=HMM):
-            width = len(w)
-            yield (w, start, start + width)
+        for word in cut(unicode_sentence, hmm=hmm):
+            width = len(word)
+            yield (word, start, start + width)
             start += width
     else:
-        for w in cut(unicode_sentence, hmm=HMM):
-            width = len(w)
-            if len(w) > 2:
-                for i in xrange(len(w) - 1):
-                    gram2 = w[i:i + 2]
+        for word in cut(unicode_sentence, hmm=hmm):
+            width = len(word)
+            if width > 2:
+                for i in xrange(width - 1):
+                    gram2 = word[i:i + 2]
                     if FREQ.get(gram2):
                         yield (gram2, start + i, start + i + 2)
-            if len(w) > 3:
-                for i in xrange(len(w) - 2):
-                    gram3 = w[i:i + 3]
+            if width > 3:
+                for i in xrange(width - 2):
+                    gram3 = word[i:i + 3]
                     if FREQ.get(gram3):
                         yield (gram3, start + i, start + i + 3)
-            yield (w, start, start + width)
+            yield (word, start, start + width)
             start += width
