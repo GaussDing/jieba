@@ -7,8 +7,9 @@ import jieba
 import jieba.posseg as posse
 import jieba.analyse as analyse
 
-
-jieba.load_userdict('userdict.txt')
+word_dict = {u'每月': ["每月"]}
+jieba.load_userdict_from_file('userdict.txt')
+jieba.load_userdict_from_dict(word_dict)
 
 re_han_default = re.compile("([\u4E00-\u9FA5a-zA-Z0-9+#&\._]+)", re.U)
 re_skip_default = re.compile("(\r\n|\s)", re.U)
@@ -103,8 +104,8 @@ if __name__ == "__main__":
     """
     words = u"工信处女干事每月经过下属科室都要亲口交代交换机等技术性器件的安装工作, 科学术"
     # segment_all_words(words)
-    segment_text_desc(words)
-    # segment_word(words)
+    # segment_text_desc(words)
+    segment_hmm_words(words)
     # segment_cut_all_word(words)
     # segment_text_desc(words)
     # segment_user_input(words)

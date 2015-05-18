@@ -374,7 +374,7 @@ def cut_for_search(sentence, hmm=True):
 
 
 @require_initialized
-def load_userdict(file_path):
+def load_userdict_from_file(file_path):
     """
     Load personalized dict to improve detect rate.
     Structure of dict file:
@@ -396,6 +396,28 @@ def load_userdict(file_path):
             except Exception as e:
                 logger.debug('%s at line %s %s' % (fp.name, line, item))
                 traceback.print_exc(e)
+
+
+@require_initialized
+def load_userdict_from_dict(word_dict):
+    """
+    Load personalized dict to improve detect rate.
+    Structure of dict file:
+    word1 freq1 word_type1
+    word2 freq2 word_type2
+    ...
+    Word type may be ignored
+    :param word_dict: A plain text file contains words and their occurrences.
+    :return:
+    """
+    for word, item in word_dict.iteritems():
+        try:
+            if not item:
+                continue
+            add_word(*item)
+        except Exception as e:
+            logger.debug('%s content %s can not add the dict' % (word, item))
+            traceback.print_exc(e)
 
 
 @require_initialized
