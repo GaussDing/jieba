@@ -1,4 +1,5 @@
 from __future__ import absolute_import, unicode_literals
+
 __version__ = '0.36'
 __license__ = 'MIT'
 
@@ -7,6 +8,7 @@ import os
 import time
 import tempfile
 import marshal
+import traceback
 from math import log
 import threading
 from functools import wraps
@@ -393,7 +395,7 @@ def load_userdict(file_path):
                 add_word(*tup)
             except Exception as e:
                 logger.debug('%s at line %s %s' % (fp.name, line, item))
-                raise e
+                traceback.print_exc(e)
 
 
 @require_initialized
@@ -439,7 +441,7 @@ def suggest_freq(segment):
     :return:
     # TODO about the join word weight set
     """
-    f_total = float(total)
+    f_total = float(max(total, 1))
     freq = total
     if isinstance(segment, string_types):
         for seg in cut(segment, hmm=False):
