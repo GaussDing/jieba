@@ -7,8 +7,9 @@ import jieba
 import jieba.posseg as posse
 import jieba.analyse as analyse
 
-
-jieba.load_userdict('userdict.txt')
+word_dict = {u'每月': ["每月"]}
+jieba.load_userdict_from_file('userdict.txt')
+jieba.load_userdict_from_dict(word_dict)
 
 re_han_default = re.compile("([\u4E00-\u9FA5a-zA-Z0-9+#&\._]+)", re.U)
 re_skip_default = re.compile("(\r\n|\s)", re.U)
@@ -16,8 +17,14 @@ re_han_cut_all = re.compile("([\u4E00-\u9FA5]+)", re.U)
 re_skip_cut_all = re.compile("[^a-zA-Z0-9+#\n]", re.U)
 
 
-def segment_words(texts):
-    word_info = jieba.cut_for_search(texts)
+def segment_all_words(texts):
+    word_info = jieba.cut(texts, cut_all=True)
+    for item in word_info:
+        print item
+
+
+def segment_hmm_words(texts):
+    word_info = jieba.cut(texts, hmm=True)
     for item in word_info:
         print item
 
@@ -43,8 +50,10 @@ def segment_text_desc(word):
     :param word:
     :return:
     """
-    key_words = sorted(jieba.cut_for_search(word), key=lambda x: len(x), reverse=True)[:5]
+    key_words = jieba.tokenize(word)
 
+    for item in key_words:
+        print item
     return list(key_words)
 
 
@@ -71,7 +80,8 @@ def segment_cut_all_word(word):
     :return:
     """
     seg_words = jieba.cut(word, cut_all=True)
-
+    for item in seg_words:
+        print item
     return list(seg_words)
 
 
@@ -92,6 +102,10 @@ if __name__ == "__main__":
     关键字提取：清华大学美术学院/阿狸/虚构/狐狸/一名/创造/学生/来自/出来
               根据tf/idf方法，进行词排序
     """
-    words = u"爸爸去哪儿"
-
-    segment_word(words)
+    words = u"工信处女干事每月经过下属科室都要亲口交代交换机等技术性器件的安装工作, 科学术"
+    # segment_all_words(words)
+    # segment_text_desc(words)
+    segment_hmm_words(words)
+    # segment_cut_all_word(words)
+    # segment_text_desc(words)
+    # segment_user_input(words)
