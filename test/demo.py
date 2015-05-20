@@ -102,7 +102,7 @@ if __name__ == "__main__":
     关键字提取：清华大学美术学院/阿狸/虚构/狐狸/一名/创造/学生/来自/出来
               根据tf/idf方法，进行词排序
     """
-    words = u"工信处女干事每月经过下属科室都要亲口交代交换机等技术性器件的安装工作, 科学术"
+    words = u"工信处女干事每月经过下属科室都要亲口交代交换机等技术性器件的安装工作, 改判被告人死刑"
     # segment_all_words(words)
     # segment_text_desc(words)
     segment_hmm_words(words)

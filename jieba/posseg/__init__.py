@@ -60,7 +60,7 @@ def load_model(f_name, isJython=True):
     abs_path = os.path.join(_curpath, CHAR_STATE_TAB_P)
     with open(abs_path, 'rb') as f:
         state = marshal.load(f)
-    f.closed
+    f.close()
 
     return state, start_p, trans_p, emit_p, result
 
@@ -148,9 +148,9 @@ def __cut_detail(sentence):
 
 
 def __cut_DAG_NO_HMM(sentence):
-    DAG = jieba.get_DAG(sentence)
+    DAG = jieba.get_sentence_dag(sentence)
     route = {}
-    jieba.calc(sentence, DAG, route)
+    jieba.calc_path_backward(sentence, DAG, route)
     x = 0
     N = len(sentence)
     buf = ''
@@ -172,10 +172,10 @@ def __cut_DAG_NO_HMM(sentence):
 
 
 def __cut_DAG(sentence):
-    DAG = jieba.get_DAG(sentence)
+    DAG = jieba.get_sentence_dag(sentence)
     route = {}
 
-    jieba.calc(sentence, DAG, route)
+    jieba.calc_path_backward(sentence, DAG, route)
 
     x = 0
     buf = ''

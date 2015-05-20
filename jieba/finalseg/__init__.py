@@ -7,9 +7,9 @@ from .._compat import *
 
 MIN_FLOAT = -3.14e100
 
-PROB_START_P = "prob_start.p"
-PROB_TRANS_P = "prob_trans.p"
-PROB_EMIT_P = "prob_emit.p"
+# PROB_START_P = "prob_start.p"
+# PROB_TRANS_P = "prob_trans.p"
+# PROB_EMIT_P = "prob_emit.p"
 
 
 PrevStatus = {
@@ -20,33 +20,33 @@ PrevStatus = {
 }
 
 
-def load_model():
-    _curpath = os.path.normpath(
-        os.path.join(os.getcwd(), os.path.dirname(__file__)))
-
-    start_p = {}
-    abs_path = os.path.join(_curpath, PROB_START_P)
-    with open(abs_path, 'rb') as f:
-        start_p = marshal.load(f)
-
-    trans_p = {}
-    abs_path = os.path.join(_curpath, PROB_TRANS_P)
-    with open(abs_path, 'rb') as f:
-        trans_p = marshal.load(f)
-
-    emit_p = {}
-    abs_path = os.path.join(_curpath, PROB_EMIT_P)
-    with open(abs_path, 'rb') as f:
-        emit_p = marshal.load(f)
-
-    return start_p, trans_p, emit_p
-
-if sys.platform.startswith("java"):
-    start_P, trans_P, emit_P = load_model()
-else:
-    from .prob_start import P as start_P
-    from .prob_trans import P as trans_P
-    from .prob_emit import P as emit_P
+# def load_model():
+#     _curpath = os.path.normpath(
+#         os.path.join(os.getcwd(), os.path.dirname(__file__)))
+#
+#     start_p = {}
+#     abs_path = os.path.join(_curpath, PROB_START_P)
+#     with open(abs_path, 'rb') as f:
+#         start_p = marshal.load(f)
+#
+#     trans_p = {}
+#     abs_path = os.path.join(_curpath, PROB_TRANS_P)
+#     with open(abs_path, 'rb') as f:
+#         trans_p = marshal.load(f)
+#
+#     emit_p = {}
+#     abs_path = os.path.join(_curpath, PROB_EMIT_P)
+#     with open(abs_path, 'rb') as f:
+#         emit_p = marshal.load(f)
+#
+#     return start_p, trans_p, emit_p
+#
+# if sys.platform.startswith("java"):
+#     start_P, trans_P, emit_P = load_model()
+# else:
+from .prob_start import P as start_P
+from .prob_trans import P as trans_P
+from .prob_emit import P as emit_P
 
 
 def viterbi(obs, states, start_p, trans_p, emit_p):
@@ -68,7 +68,7 @@ def viterbi(obs, states, start_p, trans_p, emit_p):
 
     (prob, state) = max((V[len(obs) - 1][y], y) for y in 'ES')
 
-    return (prob, path[state])
+    return prob, path[state]
 
 
 def __cut(sentence):
