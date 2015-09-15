@@ -3,9 +3,15 @@
 # Last modified: linpeng.ding(DDYDLP@gmail.com)
 
 import re
+import logging
 import jieba
 import jieba.posseg as posse
 import jieba.analyse as analyse
+
+log_console = logging.StreamHandler()
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+logger.addHandler(log_console)
 
 word_dict = {u'每月': ["每月"]}
 jieba.load_userdict_from_file('userdict.txt')
@@ -26,7 +32,7 @@ def segment_all_words(texts):
 def segment_hmm_words(texts):
     word_info = jieba.cut(texts, hmm=True)
     for item in word_info:
-        print item
+        logger.debug(item)
 
 
 def segment_word(word):
@@ -68,8 +74,9 @@ def segment_user_input(word):
     # key_words = map(lambda x: x.word, sorted(filter(lambda x: x.flag[0] in lexical, seg_words),
     #                                          key=lambda x: lexical.index(x.flag[0])))
     key_words = analyse.extract_tags(word, max(len(word) / 7, 5))
-    if not key_words:
-        return [word.decode('utf-8')]
+    for item in key_words:
+        print item
+
     return key_words
 
 

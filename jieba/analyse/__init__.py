@@ -19,6 +19,7 @@ STOP_WORDS = set((
     "this","then","at","have","all","not","one","has","or","that"
 ))
 
+
 class IDFLoader:
     def __init__(self):
         self.path = ""
@@ -44,11 +45,13 @@ class IDFLoader:
 idf_loader = IDFLoader()
 idf_loader.set_new_path(abs_path)
 
+
 def set_idf_path(idf_path):
     new_abs_path = os.path.normpath(os.path.join(os.getcwd(), idf_path))
     if not os.path.exists(new_abs_path):
         raise Exception("jieba: path does not exist: " + new_abs_path)
     idf_loader.set_new_path(new_abs_path)
+
 
 def set_stop_words(stop_words_path):
     global STOP_WORDS
@@ -60,29 +63,30 @@ def set_stop_words(stop_words_path):
     for line in lines:
         STOP_WORDS.add(line)
 
-def extract_tags(sentence, topK=20, withWeight=False, allowPOS=[]):
+
+def extract_tags(sentence, top_k=20, with_weight=False, allow_pos=None):
     """
-    Extract keywords from sentence using TF-IDF algorithm.
-    Parameter:
-        - topK: return how many top keywords. `None` for all possible words.
-        - withWeight: if True, return a list of (word, weight);
-                      if False, return a list of words.
-        - allowPOS: the allowed POS list eg. ['ns', 'n', 'vn', 'v','nr'].
-                    if the POS of w is not in this list,it will be filtered.
+    Extract keywords from sentence using TF-IDF algorithm
+    :param sentence:
+    :param top_k: return how many top keywords. `None` for all possible words
+    :param with_weight: if True, return a list of (word, weight);if False, return a list of words
+    :param allow_pos: the allowed POS list eg. ['ns', 'n', 'vn', 'v','nr']
+                if the POS of w is not in this list,it will be filtered
+    :return:
     """
     global STOP_WORDS, idf_loader
 
     idf_freq, median_idf = idf_loader.get_idf()
 
-    if allowPOS:
-        allowPOS = frozenset(allowPOS)
+    if allow_pos:
+        allow_pos = frozenset(allow_pos)
         words = jieba.posseg.cut(sentence)
     else:
         words = jieba.cut(sentence)
     freq = {}
     for w in words:
-        if allowPOS:
-            if w.flag not in allowPOS:
+        if allow_pos:
+            if w.flag not in allow_pos:
                 continue
             else:
                 w = w.word
@@ -93,11 +97,11 @@ def extract_tags(sentence, topK=20, withWeight=False, allowPOS=[]):
     for k in freq:
         freq[k] *= idf_freq.get(k, median_idf) / total
 
-    if withWeight:
+    if with_weight:
         tags = sorted(freq.items(), key=itemgetter(1), reverse=True)
     else:
         tags = sorted(freq, key=freq.__getitem__, reverse=True)
-    if topK:
-        return tags[:topK]
+    if top_k:
+        return tags[:top_k]
     else:
         return tags
